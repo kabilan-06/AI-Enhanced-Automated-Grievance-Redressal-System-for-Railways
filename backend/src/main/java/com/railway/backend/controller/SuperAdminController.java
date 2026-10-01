@@ -1,0 +1,167 @@
+package com.railway.backend.controller;
+
+import com.railway.backend.entity.User;
+import com.railway.backend.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@RestController
+@RequestMapping("/superadmin")
+@RequiredArgsConstructor
+public class SuperAdminController {
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    // List all users (role summary)
+    @GetMapping("/users")
+    public ResponseEntity<List<Map<String, Object>>> getAllUsers() {
+        List<Map<String, Object>> users = userRepository.findAll().stream().map(u -> {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", u.getId());
+            m.put("userCode", resolveUniqueCode(u));
+            m.put("username", u.getUsername());
+            m.put("role", u.getRole());
+            m.put("staffId", u.getStaffId());
+            m.put("station", u.getStation());
+            m.put("trainNumber", u.getTrainNumber());
+            m.put("createdAt", u.getCreatedAt());
+            return m;
+        }).collect(Collectors.toList());
+        return ResponseEntity.ok(users);
+    }
+
+    // Create a user with any role (station master, staff, RPF admin etc.)
+    @PostMapping("/users")
+    public ResponseEntity<?> createUser(@RequestBody Map<String, String> body) {
+        String email = body.get("email");
+        String password = body.get("password");
+        String role = body.get("role");
+        String stationName = body.get("stationName");
+        String trainNumber = body.get("trainNumber");
+
+        if (email == null || email.isBlank() || password == null || password.length() < 6 || role == null) {
+            Map<String, String> err = new HashMap<>();
+            err.put("message", "email, password (min 6 chars), and role are required");
+            return ResponseEntity.badRequest().body(err);
+        }
+        if (userRepository.findByUsername(email.toLowerCase()).isPresent()) {
+            Map<String, String> err = new HashMap<>();
+            err.put("message", "Email already exists");
+            return ResponseEntity.badRequest().body(err);
+        }
+
+        String normalizedRole = role.toUpperCase();
+        User user = User.builder()
+                .username(email.toLowerCase())
+                .password(passwordEncoder.encode(password))
+                .role(normalizedRole)
+                .staffId("STATION_STAFF".equals(normalizedRole) ? generateUniqueStaffId() : null)
+                .station(stationName)
+                .trainNumber(trainNumber)
+                .build();
+        User saved = userRepository.save(user);
+
+        Map<String, Object> res = new HashMap<>();
+        res.put("message", "User created successfully");
+        res.put("id", saved.getId());
+        res.put("userCode", resolveUniqueCode(saved));
+        res.put("username", saved.getUsername());
+        res.put("role", saved.getRole());
+        res.put("staffId", saved.getStaffId());
+        res.put("station", saved.getStation());
+        res.put("trainNumber", saved.getTrainNumber());
+        return ResponseEntity.status(HttpStatus.CREATED).body(res);
+    }
+
+    // Update a user's role or station
+    @PatchMapping("/users/{id}")
+    public ResponseEntity<?> updateUser(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        return userRepository.findById(id).map(user -> {
+            if (body.containsKey("role")) {
+                String updatedRole = body.get("role").toUpperCase();
+                user.setRole(updatedRole);
+                if ("STATION_STAFF".equals(updatedRole) && (user.getStaffId() == null || user.getStaffId().isBlank())) {
+                    user.setStaffId(generateUniqueStaffId());
+                }
+            }
+            if (body.containsKey("stationName"))
+                user.setStation(body.get("stationName"));
+            if (body.containsKey("trainNumber")) {
+                String trainNumber = body.get("trainNumber");
+                if (trainNumber != null && trainNumber.isBlank()) {
+                    trainNumber = null;
+                }
+                user.setTrainNumber(trainNumber);
+            }
+            userRepository.save(user);
+            Map<String, Object> res = new HashMap<>();
+            res.put("message", "User updated");
+            res.put("id", user.getId());
+            res.put("userCode", resolveUniqueCode(user));
+            res.put("username", user.getUsername());
+            res.put("role", user.getRole());
+            res.put("staffId", user.getStaffId());
+            res.put("station", user.getStation());
+            res.put("trainNumber", user.getTrainNumber());
+            return ResponseEntity.ok(res);
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
+    // Delete a user
+    @DeleteMapping("/users/{id}")
+    public ResponseEntity<?> deleteUser(@PathVariable Long id) {
+        if (!userRepository.existsById(id))
+            return ResponseEntity.notFound().build();
+        userRepository.deleteById(id);
+        Map<String, String> res = new HashMap<>();
+        res.put("message", "User deleted");
+        return ResponseEntity.ok(res);
+    }
+
+    // System overview stats
+    @GetMapping("/stats")
+    public ResponseEntity<Map<String, Object>> getStats() {
+        List<User> all = userRepository.findAll();
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("totalUsers", all.size());
+        stats.put("stationMasters", all.stream().filter(u -> "STATION_MASTER".equals(u.getRole())).count());
+        stats.put("stationStaff", all.stream().filter(u -> "STATION_STAFF".equals(u.getRole())).count());
+        stats.put("rpfAdmins", all.stream().filter(u -> "RPF_ADMIN".equals(u.getRole())).count());
+        stats.put("passengers",
+                all.stream().filter(u -> "USER".equals(u.getRole()) || "PASSENGER".equals(u.getRole())).count());
+        return ResponseEntity.ok(stats);
+    }
+
+    private String resolveUniqueCode(User user) {
+        if ("STATION_STAFF".equals(user.getRole()) && user.getStaffId() != null && !user.getStaffId().isBlank()) {
+            return user.getStaffId();
+        }
+        return toUserCode(user.getId());
+    }
+
+    private String toUserCode(Long id) {
+        if (id == null) {
+            return null;
+        }
+        return String.format("USR-%06d", id);
+    }
+
+    private String generateUniqueStaffId() {
+        String staffId;
+        do {
+            String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
+            staffId = "STF-" + suffix;
+        } while (userRepository.existsByStaffId(staffId));
+        return staffId;
+    }
+}

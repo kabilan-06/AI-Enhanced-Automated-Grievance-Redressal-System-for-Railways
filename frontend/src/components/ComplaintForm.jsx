@@ -1,0 +1,217 @@
+import React, { useState, useContext, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import API from "../api";
+import { AuthContext } from "../context/AuthContext";
+import Navbar from "./Navbar";
+
+const ComplaintForm = () => {
+    const navigate = useNavigate();
+    const { user, logout: logoutFn } = useContext(AuthContext);
+
+    const [passengerName, setPassengerName] = useState("");
+    const [passengerPhone, setPassengerPhone] = useState("");
+    const [complaintText, setComplaintText] = useState("");
+    const [trainNumber, setTrainNumber] = useState("");
+    const [incidentAt, setIncidentAt] = useState("");
+    const [previousStation, setPreviousStation] = useState("");
+    const [nextStation, setNextStation] = useState("");
+    const [error, setError] = useState("");
+    const [success, setSuccess] = useState("");
+    const [loading, setLoading] = useState(false);
+    const fallbackNameFromUsername = (value) => {
+        const localPart = (value || "").split("@")[0];
+        return localPart
+            .split(/[._-]+/)
+            .filter(Boolean)
+            .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+            .join(" ") || "User";
+    };
+    const isPassengerUser = user?.role === "USER";
+    const autoPassengerName = (user?.fullName || fallbackNameFromUsername(user?.username || "")).trim();
+
+    useEffect(() => {
+        if (isPassengerUser && autoPassengerName) {
+            setPassengerName(autoPassengerName);
+        }
+    }, [isPassengerUser, autoPassengerName]);
+
+    const handleLogout = () => {
+        logoutFn();
+        navigate("/login");
+    };
+
+    React.useEffect(() => {
+        const fullName = user?.fullName?.trim();
+        const username = user?.username?.trim();
+        const fallback = username ? username.split("@")[0] : "";
+        setPassengerName(fullName || fallback);
+    }, [user]);
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setError("");
+        setSuccess("");
+        setLoading(true);
+        try {
+            await API.post("/complaints", {
+                passengerName,
+                passengerPhone,
+                complaintText,
+                trainNumber,
+                incidentAt,
+                previousStation,
+                nextStation,
+                category: "GENERAL",
+            });
+            setSuccess("Complaint submitted successfully!");
+            setPassengerName(isPassengerUser ? autoPassengerName : "");
+            setPassengerPhone("");
+            setComplaintText("");
+            setTrainNumber("");
+            setIncidentAt("");
+            setPreviousStation("");
+            setNextStation("");
+            setTimeout(() => {
+                navigate("/complaints");
+            }, 2000);
+        } catch (err) {
+            const responseData = err.response?.data;
+            if (typeof responseData?.message === "string" && responseData.message.trim()) {
+                setError(responseData.message);
+            } else if (responseData && typeof responseData === "object") {
+                const details = Object.entries(responseData)
+                    .map(([field, message]) => `${field}: ${message}`)
+                    .join(", ");
+                setError(details || "Failed to submit complaint");
+            } else if (err.response?.status === 401 || err.response?.status === 403) {
+                setError("Your session expired. Please log in again.");
+            } else {
+                setError("Failed to submit complaint");
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="min-h-screen bg-gray-50">
+            <Navbar onLogout={handleLogout} />
+            <div className="max-w-4xl mx-auto px-4 py-8">
+                <section className="bg-gradient-to-br from-orange-50 to-white rounded-2xl shadow-xl border border-orange-200 p-8">
+                    <div className="flex items-center gap-3 mb-2">
+                        <span className="inline-flex items-center justify-center h-10 w-10 rounded-full bg-orange-100 text-orange-700 text-2xl shadow">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-7 h-7">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75A2.25 2.25 0 0014.25 4.5h-4.5A2.25 2.25 0 007.5 6.75v3.75m9 0v6.75A2.25 2.25 0 0114.25 19.5h-4.5A2.25 2.25 0 017.5 17.25V10.5m9 0h-9" />
+                            </svg>
+                        </span>
+                        <h2 className="text-2xl font-bold text-[#7b1f2b] tracking-tight">Lodge Your Grievance</h2>
+                    </div>
+                    <p className="text-gray-600 mb-6">Submit your complaint and we'll address it promptly.</p>
+                    {error && <div className="bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded mb-4">{error}</div>}
+                    {success && <div className="bg-green-50 border border-green-300 text-green-700 px-4 py-3 rounded mb-4">{success}</div>}
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        <div>
+                            <label className="block text-gray-700 font-semibold mb-2">Passenger Name <span className="text-orange-600">*</span></label>
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    placeholder={isPassengerUser ? "" : "Enter your full name"}
+                                    value={passengerName}
+                                    onChange={(e) => setPassengerName(e.target.value)}
+                                    className={`w-full px-4 py-3 border border-gray-300 rounded-lg pr-10 ${isPassengerUser
+                                        ? "bg-gray-100 text-gray-500 cursor-not-allowed"
+                                        : "focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                        }`}
+                                    disabled={isPassengerUser}
+                                    required
+                                />
+                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-orange-400">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 19.5a7.5 7.5 0 0115 0v.75A2.25 2.25 0 0117.25 22.5h-10.5A2.25 2.25 0 014.5 20.25V19.5z" />
+                                    </svg>
+                                </span>
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-gray-700 font-semibold mb-2">Passenger Contact Number <span className="text-orange-600">*</span></label>
+                            <input
+                                type="tel"
+                                placeholder="e.g. 9876543210"
+                                value={passengerPhone}
+                                onChange={(e) => setPassengerPhone(e.target.value)}
+                                pattern="^[0-9]{10,15}$"
+                                title="Enter 10 to 15 digits"
+                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-gray-700 font-semibold mb-2">Train Number <span className="text-orange-600">*</span></label>
+                            <input
+                                type="text"
+                                placeholder="e.g. 126001"
+                                value={trainNumber}
+                                onChange={(e) => setTrainNumber(e.target.value)}
+                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-gray-700 font-semibold mb-2">Incident Date & Time <span className="text-orange-600">*</span></label>
+                            <input
+                                type="datetime-local"
+                                value={incidentAt}
+                                onChange={(e) => setIncidentAt(e.target.value)}
+                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                required
+                            />
+                        </div>
+                        <div className="grid md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-gray-700 font-semibold mb-2">Previous Station <span className="text-orange-600">*</span></label>
+                                <input
+                                    type="text"
+                                    placeholder="e.g. Nashik Road"
+                                    value={previousStation}
+                                    onChange={(e) => setPreviousStation(e.target.value)}
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-gray-700 font-semibold mb-2">Next Station <span className="text-orange-600">*</span></label>
+                                <input
+                                    type="text"
+                                    placeholder="e.g. Mumbai CSMT"
+                                    value={nextStation}
+                                    onChange={(e) => setNextStation(e.target.value)}
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                    required
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-gray-700 font-semibold mb-2">Complaint Details <span className="text-orange-600">*</span></label>
+                            <textarea
+                                placeholder="Describe your grievance in detail..."
+                                value={complaintText}
+                                onChange={(e) => setComplaintText(e.target.value)}
+                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 h-32"
+                                required
+                            />
+                        </div>
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full md:w-auto bg-gradient-to-r from-[#7b1f2b] to-[#f57c00] text-white px-8 py-3 rounded-lg hover:from-orange-700 hover:to-orange-600 font-semibold text-lg shadow-md transition disabled:opacity-50"
+                        >
+                            {loading ? "Submitting..." : "Submit Grievance"}
+                        </button>
+                    </form>
+                </section>
+            </div>
+        </div>
+    );
+};
+
+export default ComplaintForm;
