@@ -3,14 +3,10 @@ server:
 
 spring:
   datasource:
-    url: jdbc:h2:file:./data/railwaydb;AUTO_SERVER=TRUE
-    username: sa
-    password: 
+    url: ${DB_URL:jdbc:h2:file:./data/railwaydb}
+    username: ${DB_USERNAME:SA}
+    password: ${DB_PASSWORD:}
     driver-class-name: org.h2.Driver
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
   jpa:
     hibernate:
       ddl-auto: update
@@ -28,7 +24,7 @@ spring:
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
 
 jwt:
-  secret: "supersecretkeyforjwt"
+  secret: ${JWT_SECRET:dev-secret-key-change-in-production}
 
 app:
   kafka:
@@ -38,8 +34,8 @@ app:
     enabled: ${APP_AI_ENABLED:true}
     classifier-url: ${APP_AI_CLASSIFIER_URL:https://midhun-2542-railwaymodel.hf.space/classify}
   internal:
-    api-key: ${APP_INTERNAL_API_KEY:railway-internal-key}
-  officer-signup-key: ${APP_OFFICER_SIGNUP_KEY:RAILMADAD_OFFICER_2026}
+    api-key: ${APP_INTERNAL_API_KEY:dev-internal-key}
+  officer-signup-key: ${APP_OFFICER_SIGNUP_KEY:dev-officer-key}
 
 logging:
   level:
