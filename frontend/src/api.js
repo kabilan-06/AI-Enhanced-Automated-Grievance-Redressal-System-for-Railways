@@ -1,7 +1,28 @@
 import axios from "axios";
 
+const configuredApiUrl = import.meta.env.VITE_API_URL?.trim();
+
+const getApiBaseUrl = () => {
+    if (configuredApiUrl) {
+        return configuredApiUrl.replace(/\/$/, "");
+    }
+
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+        return "http://localhost:8081";
+    }
+
+    if (window.location.hostname.includes("-frontend-production")) {
+        return `https://${window.location.hostname.replace(
+            "-frontend-production",
+            "-backend-production"
+        )}`;
+    }
+
+    return window.location.origin;
+};
+
 const API = axios.create({
-    baseURL: "http://localhost:8081",
+    baseURL: getApiBaseUrl(),
 });
 
 API.interceptors.request.use((config) => {
