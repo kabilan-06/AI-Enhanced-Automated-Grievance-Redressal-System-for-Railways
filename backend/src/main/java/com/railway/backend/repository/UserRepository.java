@@ -13,7 +13,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     List<User> findByStation(String station);
 
-    List<User> findByRoleAndStation(String role, String station);
+    List<User> findByRoleIgnoreCaseAndStationIgnoreCase(String role, String station);
 
     boolean existsByStaffId(String staffId);
 }

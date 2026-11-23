@@ -22,6 +22,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 
 @RestController
 @RequestMapping("/auth")
@@ -33,7 +35,7 @@ public class AuthController {
     private final JwtUtil jwtUtil;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    @Value("${app.officer-signup-key:RAILMADAD_OFFICER_2026}")
+    @Value("${app.officer-signup-key:}")
     private String officerSignupKey;
 
     @PostMapping("/signup")
@@ -58,7 +60,11 @@ public class AuthController {
             return badRequest("Invalid role selected");
         }
         if (!"USER".equals(role) && !"PASSENGER".equals(role)) {
-            if (request.getOfficerKey() == null || !officerSignupKey.equals(request.getOfficerKey().trim())) {
+            if (officerSignupKey == null || officerSignupKey.isBlank()
+                    || request.getOfficerKey() == null || request.getOfficerKey().isBlank()
+                    || !MessageDigest.isEqual(
+                            request.getOfficerKey().trim().getBytes(StandardCharsets.UTF_8),
+                            officerSignupKey.getBytes(StandardCharsets.UTF_8))) {
                 return badRequest("Invalid officer access key");
             }
         }
@@ -73,7 +79,7 @@ public class AuthController {
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(role)
                 .fullName(fullName)
-                .station(request.getStationName())
+                .station(normalizeStation(request.getStationName()))
                 .build();
 
         User savedUser = userRepository.save(user);
@@ -124,6 +130,14 @@ public class AuthController {
             return null;
         }
         return fullName.trim().replaceAll("\\s+", " ");
+    }
+
+    private String normalizeStation(String station) {
+        if (station == null) {
+            return null;
+        }
+        String normalized = station.trim().replaceAll("\\s+", " ");
+        return normalized.isBlank() ? null : normalized;
     }
 
     private String resolveDisplayName(User user) {

@@ -169,7 +169,7 @@ const StationMasterDashboard = () => {
         : 0;
     const staffWithStats = staff.map((s) => ({
         ...s,
-        displayName: (s.username || "").split("@")[0] || s.username,
+        displayName: s.fullName || ((s.username || "").split("@")[0] || s.username),
         activeCases: complaints.filter(c => c.assignedTo === s.username && c.status !== "RESOLVED").length,
         totalCases: complaints.filter(c => c.assignedTo === s.username).length,
     }));
@@ -580,4 +580,3 @@ const StationMasterDashboard = () => {
 };
 
 export default StationMasterDashboard;
-

@@ -31,7 +31,7 @@ public class UserController {
             @RequestParam(required = false) String station) {
         List<User> users;
         if (role != null && !role.isBlank() && station != null && !station.isBlank()) {
-            users = userRepository.findByRoleAndStation(role.toUpperCase(), station);
+            users = userRepository.findByRoleIgnoreCaseAndStationIgnoreCase(role.toUpperCase(), station.trim());
         } else if (role != null && !role.isBlank()) {
             users = userRepository.findByRole(role.toUpperCase());
         } else if (station != null && !station.isBlank()) {
@@ -45,6 +45,7 @@ public class UserController {
             item.put("id", u.getId());
             item.put("username", u.getUsername());
             item.put("role", u.getRole());
+            item.put("fullName", u.getFullName());
             item.put("station", u.getStation());
             item.put("trainNumber", u.getTrainNumber());
             item.put("createdAt", u.getCreatedAt());
