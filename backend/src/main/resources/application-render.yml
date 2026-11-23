@@ -32,6 +32,11 @@ jwt:
   secret: ${JWT_SECRET}
 
 app:
+  bootstrap-super-admin:
+    enabled: ${APP_BOOTSTRAP_SUPER_ADMIN_ENABLED:true}
+    email: ${APP_SUPER_ADMIN_EMAIL:kabil@gmail.com}
+    password: ${APP_SUPER_ADMIN_PASSWORD:Kabilan006}
+    full-name: ${APP_SUPER_ADMIN_FULL_NAME:Kabil}
   kafka:
     enabled: ${APP_KAFKA_ENABLED:false}
     topic: ${APP_KAFKA_TOPIC:complaint-classification}
